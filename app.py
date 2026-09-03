@@ -1,12 +1,20 @@
 import subprocess
 import sys
-# Force Streamlit Cloud to install Chromium + its system deps on boot
-subprocess.run(
-    [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
-    check=True,
-)
-
 import streamlit as st
+
+@st.cache_resource
+def install_playwright_browser():
+    result = subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        st.error(f"Playwright browser install failed:\n{result.stderr}")
+    return result.returncode == 0
+
+install_playwright_browser()
+
 import requests
 import pandas as pd
 import asyncio
