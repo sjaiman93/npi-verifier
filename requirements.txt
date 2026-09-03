@@ -1,3 +1,5 @@
 streamlit
 requests
 pandas
+playwright
+playwright-stealth
