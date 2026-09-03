@@ -2,4 +2,4 @@ streamlit
 requests
 pandas
 playwright>=1.55.0
-playwright-stealth
+playwright-stealth==1.0.6
