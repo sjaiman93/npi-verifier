@@ -1,6 +1,10 @@
-import os
-# Force Streamlit Cloud to install the Chromium browser binary on boot
-os.system("playwright install chromium")
+import subprocess
+import sys
+# Force Streamlit Cloud to install Chromium + its system deps on boot
+subprocess.run(
+    [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
+    check=True,
+)
 
 import streamlit as st
 import requests
