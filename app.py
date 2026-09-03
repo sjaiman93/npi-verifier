@@ -2,6 +2,14 @@ import streamlit as st
 import requests
 import pandas as pd
 
+def safe_str(val, default=""):
+    """
+    Safely handles None, nulls, integers, and strips whitespace.
+    """
+    if val is None:
+        return default
+    return str(val).strip()
+
 def fetch_npi_data(npi_number):
     """
     Queries the free CMS NPPES v2.1 API.
@@ -26,46 +34,46 @@ def fetch_npi_data(npi_number):
 
 def parse_provider_data(raw_data):
     """
-    Extracts the Provider's Name and State Licenses from taxonomies AND identifiers.
+    Extracts Provider Name and State Licenses safely from taxonomies AND identifiers.
     """
     basic = raw_data.get("basic", {})
-    first_name = basic.get("first_name", "")
-    last_name = basic.get("last_name", "")
-    credential = basic.get("credential", "")
+    first_name = safe_str(basic.get("first_name"))
+    last_name = safe_str(basic.get("last_name"))
+    credential = safe_str(basic.get("credential"))
     full_name = f"{first_name} {last_name} {credential}".strip()
     
     state_licenses = []
     
-    # 1. Check Taxonomies (includes states where license number wasn't explicitly entered)
+    # 1. Check Taxonomies
     taxonomies = raw_data.get("taxonomies", [])
     for tax in taxonomies:
-        state = tax.get("state", "").strip()
-        license_num = tax.get("license", "").strip() or "Not Listed in NPI"
-        desc = tax.get("desc", "None").strip()
+        state = safe_str(tax.get("state"))
+        license_num = safe_str(tax.get("license"), default="Not Listed in NPI")
+        desc = safe_str(tax.get("desc"), default="None")
         is_primary = tax.get("primary", False)
         
         if state:
             state_licenses.append({
                 "State": state,
-                "License Number": license_num,
+                "License Number": license_num if license_num else "Not Listed in NPI",
                 "Source": "Taxonomy",
-                "Specialty": desc,
+                "Specialty": desc if desc else "None",
                 "Primary": "Yes" if is_primary else "No"
             })
 
     # 2. Check Other Identifiers section
     identifiers = raw_data.get("identifiers", [])
     for ident in identifiers:
-        state = ident.get("state", "").strip()
-        license_num = ident.get("identifier", "").strip()
-        desc = ident.get("desc", "Other Identifier").strip()
+        state = safe_str(ident.get("state"))
+        license_num = safe_str(ident.get("identifier"))
+        desc = safe_str(ident.get("desc"), default="Other Identifier")
         
         if state and license_num:
             state_licenses.append({
                 "State": state,
                 "License Number": license_num,
                 "Source": "Other Identifier",
-                "Specialty": desc,
+                "Specialty": desc if desc else "Other Identifier",
                 "Primary": "N/A"
             })
              
