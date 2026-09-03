@@ -86,6 +86,8 @@ def parse_provider_data(raw_data):
 async def scrape_docinfo_states(first_name, last_name):
     """
     Automates a headless browser to search DocInfo and extract licensed states.
+    DocInfo search results render as cards with a 'Reported Locations' <dl>,
+    each location as '<dd>City, State</dd>' — no separate results table exists.
     """
     discovered_states = set()
     async with async_playwright() as p:
@@ -95,27 +97,28 @@ async def scrape_docinfo_states(first_name, last_name):
         )
         page = await context.new_page()
         await stealth_async(page)
-        
+
         try:
             await page.goto("https://www.docinfo.org/search/", timeout=15000)
             await page.fill("input[name='firstName']", first_name)
             await page.fill("input[name='lastName']", last_name)
             await page.click("button[type='submit']")
-            
-            # Wait for the table to populate
-            await page.wait_for_selector(".results-table", timeout=10000)
-            
-            # Extract state abbreviations or names from the results column
-            state_elements = await page.query_selector_all(".license-state-column")
-            for element in state_elements:
-                state_text = await element.inner_text()
-                if state_text:
-                    discovered_states.add(state_text.strip())
+
+            # Wait for at least one 'Reported Locations' block to render
+            await page.wait_for_selector("dl dd", timeout=10000)
+
+            location_dds = await page.query_selector_all("dl dd")
+            for dd in location_dds:
+                text = await dd.inner_text()
+                if "," in text:
+                    state = text.rsplit(",", 1)[-1].strip()
+                    if state:
+                        discovered_states.add(state)
         except Exception as e:
-            pass # Fails gracefully if timeout occurs or no records exist
+            pass  # Fails gracefully if timeout occurs or no records exist
         finally:
             await browser.close()
-            
+
     return list(discovered_states)
 
 def main():
