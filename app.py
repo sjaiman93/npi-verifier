@@ -104,8 +104,10 @@ async def scrape_docinfo_states(first_name, last_name):
             await page.fill("input[name='lastName']", last_name)
             await page.click("button[type='submit']")
 
-            # Wait for result cards to render
+            # Wait for result cards to render, then let any async location fetches settle
             await page.wait_for_selector("li h4", timeout=10000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await page.wait_for_timeout(1500)
 
             target = f"{first_name.lower()} {last_name.lower()}"
             list_items = await page.query_selector_all("li")
