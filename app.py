@@ -104,16 +104,25 @@ async def scrape_docinfo_states(first_name, last_name):
             await page.fill("input[name='lastName']", last_name)
             await page.click("button[type='submit']")
 
-            # Wait for at least one 'Reported Locations' block to render
-            await page.wait_for_selector("dl dd", timeout=10000)
+            # Wait for result cards to render
+            await page.wait_for_selector("li h4", timeout=10000)
 
-            location_dds = await page.query_selector_all("dl dd")
-            for dd in location_dds:
-                text = await dd.inner_text()
-                if "," in text:
-                    state = text.rsplit(",", 1)[-1].strip()
-                    if state:
-                        discovered_states.add(state)
+            target = f"{first_name.lower()} {last_name.lower()}"
+            list_items = await page.query_selector_all("li")
+            for li in list_items:
+                h4 = await li.query_selector("h4")
+                if not h4:
+                    continue
+                name_text = (await h4.inner_text()).lower()
+                if first_name.lower() in name_text and last_name.lower() in name_text:
+                    dds = await li.query_selector_all("dl dd")
+                    for dd in dds:
+                        text = await dd.inner_text()
+                        if "," in text:
+                            state = text.rsplit(",", 1)[-1].strip()
+                            if state:
+                                discovered_states.add(state)
+                    break  # matched this doctor's card, stop scanning others
         except Exception as e:
             pass  # Fails gracefully if timeout occurs or no records exist
         finally:
