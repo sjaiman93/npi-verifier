@@ -104,12 +104,10 @@ async def scrape_docinfo_states(first_name, last_name):
             await page.fill("input[name='lastName']", last_name)
             await page.click("button[type='submit']")
 
-            # Wait for result cards to render, then let any async location fetches settle
+            # Wait for result cards to render
             await page.wait_for_selector("li h4", timeout=10000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            await page.wait_for_timeout(1500)
 
-            target = f"{first_name.lower()} {last_name.lower()}"
+            target_li = None
             list_items = await page.query_selector_all("li")
             for li in list_items:
                 h4 = await li.query_selector("h4")
@@ -117,16 +115,28 @@ async def scrape_docinfo_states(first_name, last_name):
                     continue
                 name_text = (await h4.inner_text()).lower()
                 if first_name.lower() in name_text and last_name.lower() in name_text:
-                    dds = await li.query_selector_all("dl dd")
-                    for dd in dds:
-                        text = await dd.inner_text()
-                        if "," in text:
-                            state = text.rsplit(",", 1)[-1].strip()
-                            if state:
-                                discovered_states.add(state)
-                    break  # matched this doctor's card, stop scanning others
+                    target_li = li
+                    break
+
+            if target_li:
+                # Poll this card's dd count until it stops growing (handles async-loaded locations)
+                prev_count = -1
+                for _ in range(10):
+                    dds = await target_li.query_selector_all("dl dd")
+                    if len(dds) == prev_count and len(dds) > 0:
+                        break
+                    prev_count = len(dds)
+                    await page.wait_for_timeout(500)
+
+                dds = await target_li.query_selector_all("dl dd")
+                for dd in dds:
+                    text = await dd.inner_text()
+                    if "," in text:
+                        state = text.rsplit(",", 1)[-1].strip()
+                        if state:
+                            discovered_states.add(state)
         except Exception as e:
-            pass  # Fails gracefully if timeout occurs or no records exist
+            st.warning(f"DocInfo scrape error (debug): {e}")
         finally:
             await browser.close()
 
