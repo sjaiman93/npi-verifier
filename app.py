@@ -83,11 +83,14 @@ def parse_provider_data(raw_data):
              
     return first_name, last_name, full_name, unique_licenses
 
+import urllib.parse
+
 async def scrape_docinfo_states(first_name, last_name):
     """
     Automates a headless browser to search DocInfo and extract licensed states.
-    DocInfo search results render as cards with a 'Reported Locations' <dl>,
-    each location as '<dd>City, State</dd>' — no separate results table exists.
+    DocInfo results render as <li> cards with a 'Reported Locations' <dl>,
+    each location as '<dd>City, State</dd>'. Search is done via direct URL
+    query params (docname=...), not a fillable form.
     """
     discovered_states = set()
     async with async_playwright() as p:
@@ -99,10 +102,9 @@ async def scrape_docinfo_states(first_name, last_name):
         await stealth_async(page)
 
         try:
-            await page.goto("https://www.docinfo.org/search/", timeout=15000)
-            await page.fill("input[name='firstName']", first_name)
-            await page.fill("input[name='lastName']", last_name)
-            await page.click("button[type='submit']")
+            docname = urllib.parse.quote(f"{first_name} {last_name}".upper())
+            url = f"https://www.docinfo.org/search-results?docname={docname}&pracType=Physician&licstate=all&from=0&size=30"
+            await page.goto(url, timeout=20000)
 
             # Wait for result cards to render
             await page.wait_for_selector("li h4", timeout=10000)
